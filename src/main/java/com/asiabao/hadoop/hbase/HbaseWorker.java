@@ -25,16 +25,20 @@ public class HbaseWorker implements Runnable {
     private boolean test = false;
     private String path;
     private String siteId;
+    private String devId;
     private String columnfarily;
-    public static final String WTNO = "WTNO";
-    public static final String DateAcqTime = "DateAcqTime";
-
-    public HbaseWorker(String workName, String path, String siteId, String columnfarily) {
+    //public static final String WTNO = "WTNO";
+    //public static final String DateAcqTime = "DateAcqTime";
+    public static final String TimeStamp = "Time stamp";
+    public static final String TimeStampMsec = "Time stamp_msec";
+    
+    public HbaseWorker(String workName, String path, String siteId, String columnfarily,String devId) {
         super();
         this.workName = workName;
         this.path = path;
         this.siteId = siteId;
         this.columnfarily = columnfarily;
+        this.devId = devId;
     }
 
     private void collectionInfo(String path) throws ParseException {
@@ -55,7 +59,9 @@ public class HbaseWorker implements Runnable {
             csvReader.readHeaders();
             String[] headers = csvReader.getHeaders();
             List<Row> rs = new ArrayList<Row>();
+            int rowNumber = 0;
             while (csvReader.readRecord()) {
+            	rowNumber++;
                 // 读一整行
                 // System.out.println(csvReader.getRawRecord());
                 // 读这行的某一列
@@ -66,21 +72,25 @@ public class HbaseWorker implements Runnable {
                     Column col = new Column(key, value);
                     cols.add(col);
                 }
-                String devId = csvReader.get(WTNO);
-                String time = csvReader.get(DateAcqTime);
+                //String devId = csvReader.get(WTNO);			//设备id
+                String TimeStampStr  = csvReader.get(TimeStamp);
+                String TimeStampMsecStr = csvReader.get(TimeStampMsec);
+                String time = TimeStampStr+":"+TimeStampMsecStr;
                 String rowkey = null;
                 try {
                     if(StringUtils.isBlank(time)){
                         LOG.info("=filePath= " + filePath + " devId  " + devId + " time " + time );
                         continue;
                     }
-                    rowkey = RowKeyGenerator.getIns().generateRowKeytoString(siteId, devId, time);
+                    rowkey = RowKeyGenerator.getIns().generateRowKeytoString(siteId, devId, time);//rowkey = 风场id+设备id+时间戳
                     Row r = new Row(cols,rowkey);
                     rs.add(r);
                     count++;
                     if (count % insertCount == 0){
                         LOG.info(path + " :开始存储数据 大小 " + rs.size());
-                        dao.addRecords(workName, columnfarily, rs);
+                        System.out.println("begin insert data");
+                        dao.addRecords(workName, columnfarily, rs);//调用存储
+                        System.out.println("insert data success !!");
                         rs.clear();
                     }
                 } catch (Exception e) {
@@ -105,7 +115,9 @@ public class HbaseWorker implements Runnable {
     public void run() {
         try {
             Random rd = new Random();
+            
             dao = HbaseDaofactory.getFactory().getHDao();
+            //dao.init(workName, columnfarily);
             LOG.info(path + "　开始工作");
             collectionInfo(path);
             LOG.info(path + "　开始完毕");
@@ -120,5 +132,9 @@ public class HbaseWorker implements Runnable {
         dao.closeConnection();
         LOG.info(workName + " 线程停止");
     }
-
+ 
+    private String getWorkInfo(){
+    	String result = "文件路径 =" + path + " 风场id="+siteId + " 设备id="+devId + " 列簇名="+ columnfarily;
+    	return result;
+    }
 }

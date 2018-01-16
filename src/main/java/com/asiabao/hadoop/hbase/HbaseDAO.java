@@ -47,6 +47,11 @@ public class HbaseDAO {
 
     public HbaseDAO() throws Exception {
         cfg = HBaseConfiguration.create();
+        /*cfg.set("hbase.zookeeper.quorum",
+                "node3.abdata.com");
+    	cfg.set("hbase.zookeeper.property.clientPort", "2181");
+    	cfg.set("zookeeper.znode.parent", "/hbase-unsecure");*/
+        
         cfg.set("hbase.zookeeper.quorum",
                 "node2.master.zdt.com,node1.master.zdt.com,node1.slave.zdt.com,node2.slave.zdt.com,node8.slave.zdt.com");
 //        cfg.set("hbase.zookeeper.quorum", "node3.abdata.com");
@@ -362,6 +367,7 @@ public class HbaseDAO {
     }
 
     public void init(String tableName, String columnfamily) {
+    	System.out.println("表初始化开始");
         this.tableName = tableName;
         this.columnfamily = columnfamily;
     }

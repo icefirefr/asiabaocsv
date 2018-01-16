@@ -28,7 +28,11 @@ public class HaseTestBoot {
     public static void main(String[] args) {
         //E:\WorkSpace\asiabao\eclipse_workspace\file-test-info\test\xs xs_point1 xs_info1 xs insert
         //E:\WorkSpace\asiabao\eclipse_workspace\file-test-info\test\xs sw_point sw_info sw query 10 "2013/12/30 13:46:30" "2013/12/30 13:50:30"
-        if (args.length == 0) {
+        				//文件路径   表名            列簇名       风场id  操作 风场id start end
+    	/*String str = "E:/xyd,xyd_point,xyd_info,xyd,insert, , , ";
+    	args = str.split(",");*/
+    	//System.out.println(args.length);
+    	if (args.length == 0) {
             System.out.println("参数错误！！！");
             System.exit(1);
         }
@@ -39,26 +43,36 @@ public class HaseTestBoot {
     }
 
     private void doMain(String[] args) {
-        String path = args[0];
-        String tableName = args[1];
-        String columnfarily = args[2];
-        String siteId = args[3];
-        String operation = args[4];
-        String devid = args[5];
-        String start = args[6];
-        String end = args[7];
+        String path = args[0];			//文件路径 E:/csvFile
+        String tableName = args[1];		//表名 xyd_point1
+        String columnfarily = args[2];	//列簇名 xyd_info1
+        String siteId = args[3];		//风场id xyd
+        String operation = args[4];		//操作 (insert/other)insert
+        String devid = args[5];			//风机id  - insert 用不上
+        String start = args[6];			//开始时间 - insert 用不上
+        String end = args[7];			//结束时间 - insert 用不上
         if (operation.equals("insert")) {
             try {
                 System.out.println("========================！");
-                HbaseDAO dao = HbaseDaofactory.getFactory().getHDao();
+                HbaseDAO dao = HbaseDaofactory.getFactory().getHDao();//获取表操作对象
                 if (!dao.existTable(tableName)) {
-                    Set<String> devids = collectionInfo(path);
-                    dao.init(tableName, columnfarily);
-                    dao.createTable(devids, siteId);
+                	System.out.println("set 获取 设备id集合");
+                    Set<String> devids = collectionInfo(path);//获取设备id - 已改
+                    System.out.println("获取设备id的个数"+ devids.size());
+                    if(devids == null){
+                    	LOG.error("获取设备id集合失败! 无法进行初始化操作，程序将结束");
+                    	return;
+                    }
+                    System.out.println("set init dao");
+                    dao.init(tableName, columnfarily);//初始化表操作对象
+                    System.out.println("create table");
+                    dao.createTable(devids, siteId);//创建表
                     LOG.info("创建表成功！！！");
-                    dao.closeConnection();
+                    dao.closeConnection();//关闭连接
                 } else {
-                    dao.init(tableName, columnfarily);
+                	System.out.println("表已经存在");
+                    dao.init(tableName, columnfarily);//初始化表列簇
+                    System.out.println("表初始化结束");
                     LOG.info("表已经存在");
                 }
                 List<MyThread> workers = collectionWorkers(path, tableName, siteId, columnfarily);
@@ -93,7 +107,7 @@ public class HaseTestBoot {
         }
 
     }
-
+/*
     private void writeFileIds(Set<String> ids) {
         String path = getClass().getResource("/").getFile() + File.separatorChar + idsFileName;
         File f = new File(path);
@@ -131,7 +145,8 @@ public class HaseTestBoot {
 
         }
     }
-
+*/
+/*    
     private String[] readFileIds() {
         String path = getClass().getResource("/").getFile();
         File file = new File(path + File.separatorChar + idsFileName);
@@ -166,69 +181,96 @@ public class HaseTestBoot {
         }
         return null;
     }
-
+*/
     private List<MyThread> collectionWorkers(String path, String tableName, String siteId, String columnfarily)
             throws ParseException {
         List<MyThread> workers = new ArrayList<MyThread>();
         File dir = new File(path);
         System.out.println(dir);
+        String deviceArea;
+    	String[] strs;
         if (dir.isDirectory()) {
-            File[] files = dir.listFiles();
-            for (File f : files) {
-                System.out.println("read " + f);
-                if (f.isDirectory()) {
-                    File[] csv_txts = f.listFiles();
-                    for (File fc : csv_txts) {
-                        LOG.info("-read " + fc);
-                        long b = System.currentTimeMillis();
-                        HbaseWorker w = new HbaseWorker(tableName, fc.getAbsolutePath(), siteId, columnfarily);
-                        MyThread worker = new MyThread(w);
-                        worker.setName(tableName);
-                        workers.add(worker);
-
-                        long a = System.currentTimeMillis();
-                        LOG.info(fc + " 用时" + (a - b) / 1000);
-                    }
-                }
-            }
+        	File[] files = dir.listFiles();
+    		for(File areaFile:files){//csvFile
+    			if(areaFile.isDirectory()){
+	    			deviceArea = areaFile.getName().substring(0, 1);
+	    			for(File csvFile:areaFile.listFiles()){//csv
+	    				if("1".equals(csvFile.getName())){//文件1是需要导入的风机数据
+	    					File[] deviceDataFiles = csvFile.listFiles();
+	    					for(File dataFile:deviceDataFiles){
+	    						strs = dataFile.getName().split("_");
+								LOG.info("-read " + dataFile);
+		                        long b = System.currentTimeMillis();
+		                        //一个文件一个线程
+		                        								//表名		文件路径				            风场id		列簇           风机id=期数+期数编号
+		                        HbaseWorker w = new HbaseWorker(tableName, dataFile.getAbsolutePath(), siteId, columnfarily,deviceArea + "_" + strs[0]);
+		                        MyThread worker = new MyThread(w);
+		                        worker.setName(tableName);
+		                        workers.add(worker);
+	
+		                        long a = System.currentTimeMillis();
+		                        LOG.info(dataFile + " 用时" + (a - b) / 1000);
+	    					}
+	    				}
+	    			}
+    			}
+    		}
         }
         return workers;
     }
 
+    /**
+     * 生成风机id
+     * 风机id = 第几期+文件名上的编码
+     *  例 
+     *  1期CSV
+     *  	- 1
+     *  		- 1_1.csv 风机id = 1_1
+	 *	2期CSV
+	 *		- 1   
+	 *			- 1_1.csv 风机id = 2_1
+     * @param path 文件路径
+     * @return 返回风机id集合
+     */
     private Set<String> collectionInfo(String path) {
-        String[] fs = readFileIds();
-        Set<String> sets = new HashSet<String>();
-        if (fs != null && fs.length > 0) {
-            for (String s : fs) {
-                sets.add(s);
-            }
-            return sets;
-        }
-        File dir = new File(path);
-        LOG.info(dir);
-        if (dir.isDirectory()) {
-            File[] files = dir.listFiles();
-            for (File f : files) {
-                System.out.println("read " + f);
-                if (f.isDirectory()) {
-                    File[] csv_txts = f.listFiles();
-                    for (File fc : csv_txts) {
-                        System.out.println("-read " + fc);
-                        long b = System.currentTimeMillis();
-                        readColumn(fc.getAbsolutePath(), "WTNO", sets);
-                        long a = System.currentTimeMillis();
-                        LOG.info(fc + " 用时" + (a - b) / 1000);
-                        LOG.info("ids " + sets);
-                    }
-                }
-            }
-        }
-        LOG.info(path + "收集风机编号完毕！！！");
-        writeFileIds(sets);
-        return sets;
+    	File rootFile = new File(path);
+    	Set<String> set = new HashSet<String>();
+    	if(!rootFile.exists()){
+    		return null;
+    	}
+    	String deviceArea;
+    	String[] strs;
+    	//如果不是规定的文件格式直接返回null
+    	try{
+	    	//if(rootFile.isDirectory()){
+	    		File[] files = rootFile.listFiles();
+	    		for(File areaFile:files){//csvFile
+	    			if(areaFile.isDirectory()){
+		    			deviceArea = areaFile.getName().substring(0, 1);
+		    			for(File csvFile:areaFile.listFiles()){//csv
+		    				if("1".equals(csvFile.getName())){//文件1是需要导入的风机数据
+		    					File[] deviceDataFiles = csvFile.listFiles();
+		    					for(File dataFile:deviceDataFiles){
+		    						strs = dataFile.getName().split("_");
+		    						if("1.csv".equals(strs[1])){
+		    							set.add(deviceArea + "_" + strs[0]);
+		    						}
+		    					}
+		    				}
+		    			}
+	    			}
+	    		}
+	    		return set;
+	    	/*}else{
+	    		return null;
+	    	}*/
+    	}catch(Exception e){
+    		
+    		return null;
+    	}
     }
 
-    public void readColumn(String filePath, String column, Set<String> sets) {
+    /*public void readColumn(String filePath, String column, Set<String> sets) {
         CsvReader csvReader = null;
         try {
             // 创建CSV读对象
@@ -249,7 +291,7 @@ public class HaseTestBoot {
         } finally {
             csvReader.close();
         }
-    }
+    }*/
 
     public class MyThread extends Thread {
 

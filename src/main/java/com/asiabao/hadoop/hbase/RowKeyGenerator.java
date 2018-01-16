@@ -10,7 +10,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 
 public class RowKeyGenerator {
 	private  final Log LOG = LogFactory.getLog(RowKeyGenerator.class);
-	private  SimpleDateFormat sf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+	private  SimpleDateFormat sf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss:SSS");
 	public  byte[] generateRowKey(String farm,String fjid,String time) throws ParseException{
 		Date times = sf.parse(time);
 		String b = farm + "_" + fjid + "_" + times.getTime();
